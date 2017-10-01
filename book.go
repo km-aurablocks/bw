@@ -1,0 +1,199 @@
+package main
+        
+
+import (
+"fmt"
+"time"
+"encoding/json"
+"github.com/hyperledger/fabric/core/chaincode/shim"
+"github.com/hyperledger/fabric/protos/peer"
+"errors"
+)
+
+// #########################
+//    Type Definitions
+// #########################
+        
+
+type library struct {
+}
+        
+type book struct {
+        BookNum string `json:"book_num"`
+        Author string `json:"author"`
+        OrderCount float64 `json:"order_count,string"`
+        Printer string `json:"printer"`
+        Amount float64 `json:"amount,string"`
+        OrderDate time.Time `json:"completed_date"`           
+}
+        
+
+type Transaction struct {
+        Txbook book
+}
+// ##################
+//       INIT
+// ##################
+        
+func (t *library) Init(stub shim.ChaincodeStubInterface) peer.Response {
+        return shim.Success(nil)
+}
+        
+
+// ########################
+//     Invocations
+// ########################
+        
+
+func (t *library) Invoke(stub shim.ChaincodeStubInterface) peer.Response {
+        // Extract the function and args from the transaction proposal
+        fn, args := stub.GetFunctionAndParameters()
+        fmt.Println("DEBUG: invoke is running " + fn)
+        fmt.Println("DEBUG: args %+v",args)
+        
+
+	if fn == "addbook" {
+                return t.addbook(stub, args)
+        } else if fn == "getbook" {
+                return t.getbook(stub, args)
+        } else if fn == "updatebook" {
+                return t.updatebook(stub, args)
+        } 
+
+
+        fmt.Println("invoke did not find function: " + fn)
+
+        return shim.Error("Received unknown function invocation")
+}
+        
+
+func (t *library) addbook(stub shim.ChaincodeStubInterface, args []string) peer.Response {
+        fmt.Println("- starting addbook")
+        var bookJSON book
+        var err error
+        
+
+        err = marshallRequest(args, &bookJSON)
+        if err != nil { return shim.Error("Failed to marshall request" + err.Error())}
+        
+        var tx Transaction
+        tx.Txbook = bookJSON
+
+        key, err := stub.CreateCompositeKey("txKey", []string{bookJSON.BookNum, bookJSON.Author})
+        if err != nil { return shim.Error(err.Error())}
+        
+
+        txAsBytes, err := json.Marshal(tx)
+        if err != nil { return shim.Error(err.Error())}
+
+        stub.PutState(key, txAsBytes)
+        fmt.Println("- end addbook")
+        return shim.Success(nil)
+}
+        
+
+
+func (t *library) getbook(stub shim.ChaincodeStubInterface, args []string) peer.Response {
+        fmt.Println("- starting getbook")
+        var bookQuery book
+        var err error
+        
+        err = marshallRequest(args, &bookQuery)
+        if err != nil { return shim.Error("Failed to marshall request: " + err.Error())}
+        
+        key, err := stub.CreateCompositeKey("txKey", []string{bookQuery.BookNum, bookQuery.Author})
+        if err != nil { return shim.Error(err.Error())}
+        
+        txBytes, err  := stub.GetState(key)
+        if err != nil {
+                return shim.Error("Failed to get tx: " + err.Error())
+        } else if txBytes == nil {
+                return shim.Error("Tx does not exist. ")
+        }
+        
+
+        var tx Transaction
+        err = json.Unmarshal(txBytes, &tx)
+        if err != nil { return shim.Error(err.Error()) }        
+
+        txBytesOut, err := json.Marshal(tx)
+        if err != nil { return shim.Error(err.Error())}
+        
+
+        fmt.Println("- end getbook")
+        return shim.Success(txBytesOut)
+}
+        
+
+
+func (t *library) updatebook(stub shim.ChaincodeStubInterface, args []string) peer.Response {
+        fmt.Println("- starting updatebook")
+
+
+        var bookQuery book
+        var err error
+
+        
+        err = marshallRequest(args, &bookQuery)
+        if err != nil { return shim.Error("Failed to marshall request: " + err.Error())}
+        
+
+        key, err := stub.CreateCompositeKey("txKey", []string{bookQuery.BookNum, bookQuery.Author})
+        if err != nil { return shim.Error(err.Error())}
+        
+
+        txBytes, err  := stub.GetState(key)
+        if err != nil { return shim.Error(err.Error())}
+        
+
+        tx := Transaction{}
+        err = json.Unmarshal(txBytes, &tx)
+        if err != nil { return shim.Error(err.Error()) }
+
+        tx.Txbook.OrderCount = bookQuery.OrderCount
+        tx.Txbook.Printer = bookQuery.Printer
+        tx.Txbook.Amount = bookQuery.Amount
+        tx.Txbook.OrderDate = bookQuery.OrderDate
+
+        txAsBytes, err := json.Marshal(tx)
+        if err != nil { return shim.Error(err.Error())}
+        
+
+        stub.PutState(key, txAsBytes)
+                
+        fmt.Println("- end updateCreditReceipts")
+        return shim.Success(nil)
+}
+        
+        
+
+// ================
+// UTILS
+// ===============
+
+func marshallRequest(args []string, book *book) error {
+        var err error
+        if len(args) != 3 {
+                return errors.New("Incorrect number of arguments, expecting 3")
+        }
+        
+
+        err = json.Unmarshal([]byte(args[0]), &book)
+        if err != nil { return err }
+        fmt.Println("DEBUG: generated book %+v", book)
+        
+
+        return nil
+}
+        
+
+// ================
+// MAIN
+// ================
+        
+
+func main() {
+        if err := shim.Start(new(library)); err != nil {
+                fmt.Printf("Error starting library chaincode: %s", err)
+        }
+}
