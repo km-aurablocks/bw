@@ -54,12 +54,7 @@ func (t *library) Invoke(stub shim.ChaincodeStubInterface) peer.Response {
 
 	if fn == "addbook" {
                 return t.addbook(stub, args)
-        } else if fn == "getbook" {
-                return t.getbook(stub, args)
-        } else if fn == "updatebook" {
-                return t.updatebook(stub, args)
         } 
-
 
         fmt.Println("invoke did not find function: " + fn)
 
@@ -90,81 +85,6 @@ func (t *library) addbook(stub shim.ChaincodeStubInterface, args []string) peer.
         fmt.Println("- end addbook")
         return shim.Success(nil)
 }
-        
-
-
-func (t *library) getbook(stub shim.ChaincodeStubInterface, args []string) peer.Response {
-        fmt.Println("- starting getbook")
-        var bookQuery book
-        var err error
-        
-        err = marshallRequest(args, &bookQuery)
-        if err != nil { return shim.Error("Failed to marshall request: " + err.Error())}
-        
-        key, err := stub.CreateCompositeKey("txKey", []string{bookQuery.BookNum, bookQuery.Author})
-        if err != nil { return shim.Error(err.Error())}
-        
-        txBytes, err  := stub.GetState(key)
-        if err != nil {
-                return shim.Error("Failed to get tx: " + err.Error())
-        } else if txBytes == nil {
-                return shim.Error("Tx does not exist. ")
-        }
-        
-
-        var tx Transaction
-        err = json.Unmarshal(txBytes, &tx)
-        if err != nil { return shim.Error(err.Error()) }        
-
-        txBytesOut, err := json.Marshal(tx)
-        if err != nil { return shim.Error(err.Error())}
-        
-
-        fmt.Println("- end getbook")
-        return shim.Success(txBytesOut)
-}
-        
-
-
-func (t *library) updatebook(stub shim.ChaincodeStubInterface, args []string) peer.Response {
-        fmt.Println("- starting updatebook")
-
-
-        var bookQuery book
-        var err error
-
-        
-        err = marshallRequest(args, &bookQuery)
-        if err != nil { return shim.Error("Failed to marshall request: " + err.Error())}
-        
-
-        key, err := stub.CreateCompositeKey("txKey", []string{bookQuery.BookNum, bookQuery.Author})
-        if err != nil { return shim.Error(err.Error())}
-        
-
-        txBytes, err  := stub.GetState(key)
-        if err != nil { return shim.Error(err.Error())}
-        
-
-        tx := Transaction{}
-        err = json.Unmarshal(txBytes, &tx)
-        if err != nil { return shim.Error(err.Error()) }
-
-        tx.Txbook.OrderCount = bookQuery.OrderCount
-        tx.Txbook.Printer = bookQuery.Printer
-        tx.Txbook.Amount = bookQuery.Amount
-        tx.Txbook.OrderDate = bookQuery.OrderDate
-
-        txAsBytes, err := json.Marshal(tx)
-        if err != nil { return shim.Error(err.Error())}
-        
-
-        stub.PutState(key, txAsBytes)
-                
-        fmt.Println("- end updateCreditReceipts")
-        return shim.Success(nil)
-}
-        
         
 
 // ================
