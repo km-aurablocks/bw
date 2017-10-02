@@ -90,8 +90,8 @@ func (t *BoardWalk) onboardInvoice(stub shim.ChaincodeStubInterface, args []stri
 
 func marshallRequest(args []string, invoice *INVOICE) error {
 	var err error
-	if len(args) != 3 {
-                return errors.New("Incorrect number of arguments, expecting 3")
+	if len(args) != 2 {
+                return errors.New("Incorrect number of arguments, expecting 2")
         }
 	
 	err = json.Unmarshal([]byte(args[0]), &invoice)
